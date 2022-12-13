@@ -24,6 +24,12 @@ public class DbController {
         return ApiResponse.ok(dbService.list());
     }
 
+    @PostMapping
+    public ApiResponse add(@RequestBody JSONObject jsonObject) {
+        dbService.add(jsonObject);
+        return ApiResponse.ok();
+    }
+
     @PutMapping
     public ApiResponse edit(@RequestBody JSONObject jsonObject) {
         return ApiResponse.ok(dbService.editById(jsonObject.getStr("id"), jsonObject));

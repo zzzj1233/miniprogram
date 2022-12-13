@@ -56,13 +56,13 @@ public class DbService implements AutoCloseable {
         return this.jsonArray;
     }
 
-    public void add(JSONObject jsonObject) {
+    public synchronized void add(JSONObject jsonObject) {
         jsonObject.set("id", UUID.randomUUID());
 
         this.jsonArray.add(jsonObject);
     }
 
-    public boolean deleteById(String id) {
+    public synchronized boolean deleteById(String id) {
         for (int i = 0; i < jsonArray.size(); i++) {
             JSONObject object = jsonArray.getJSONObject(i);
             if (object.getStr("id").equals(id)) {
@@ -73,7 +73,7 @@ public class DbService implements AutoCloseable {
         return false;
     }
 
-    public boolean editById(String id, JSONObject jsonObject) {
+    public synchronized boolean editById(String id, JSONObject jsonObject) {
         for (int i = 0; i < jsonArray.size(); i++) {
             JSONObject object = jsonArray.getJSONObject(i);
             if (object.getStr("id").equals(id)) {
