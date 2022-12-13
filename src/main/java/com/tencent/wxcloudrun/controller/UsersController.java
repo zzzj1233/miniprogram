@@ -41,7 +41,7 @@ public class UsersController {
 
     @PostMapping
     public ApiResponse add(@RequestBody Map<String, Object> map) {
-        String sql = "INSERT INTO users (`data`) values ( " + JSONUtil.toJsonStr(map) + ")";
+        String sql = "INSERT INTO users (`data`) values (  " + StrUtil.wrap(JSONUtil.toJsonStr(map), "'") + ")";
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
