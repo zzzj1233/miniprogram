@@ -1,6 +1,7 @@
 package com.tencent.wxcloudrun.service;
 
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.io.IORuntimeException;
 import cn.hutool.core.io.resource.ClassPathResource;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.json.JSONArray;
@@ -10,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
+import java.io.File;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -32,14 +34,21 @@ public class DbService implements AutoCloseable {
     public void readFile() {
         classPathResource = new ClassPathResource("db.json");
 
+        File file = classPathResource.getFile();
+
         this.jsonArray = JSONUtil.parseArray(classPathResource.readUtf8Str());
+
         log.info("Data = {} ", jsonArray);
 
         scheduledThreadPool.scheduleWithFixedDelay(() -> {
 
             log.info("Before write memory data to file");
 
-            FileUtil.writeUtf8String(this.jsonArray.toString(), classPathResource.getFile());
+            try {
+                FileUtil.writeUtf8String(this.jsonArray.toString(), file);
+            } catch (IORuntimeException e) {
+                log.error("Write error : ", e);
+            }
 
             log.info("After write memory data to file");
 
