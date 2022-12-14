@@ -2,13 +2,13 @@ package com.tencent.wxcloudrun.controller;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
-import cn.hutool.json.JSONUtil;
 import com.tencent.wxcloudrun.config.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/users")
+@Slf4j
 public class UsersController {
 
     private final JdbcTemplate jdbcTemplate;
@@ -31,50 +32,73 @@ public class UsersController {
     public ApiResponse list() {
         List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT * FROM users");
 
-        return ApiResponse.ok(
-                list.stream()
-                        .filter(it -> it.get("data") != null && StrUtil.isNotBlank(it.get("data").toString()))
-                        .map(it -> new JSONObject(it.get("data").toString()).putOnce("id", it.get("id")))
-                        .collect(Collectors.toList())
-        );
+        return ApiResponse.ok(list.stream()
+                .map(it -> new JSONObject(it))
+                .map(it -> {
+                    JSONObject jsonObject = new JSONObject(it.getStr("name"));
+                    jsonObject.putAll(it.getJSONObject("data") == null ? Collections.emptyMap() : it.getJSONObject("data"));
+                    return jsonObject;
+                }).collect(Collectors.toList()));
     }
 
     @PostMapping
-    public ApiResponse add(@RequestBody Map<String, Object> map) {
-        String sql = "INSERT INTO users (`data`) values (  " + StrUtil.wrap(JSONUtil.toJsonStr(map), "'") + ")";
+    public ApiResponse add(@RequestBody JSONObject jsonObject) {
+        // 1. 检查用户名是否存在
+        String name = jsonObject.getStr("name");
 
-        KeyHolder keyHolder = new GeneratedKeyHolder();
+        String data = jsonObject.getStr("data");
 
-        jdbcTemplate.update(connection -> connection.prepareStatement(sql, new String[]{"id"}), keyHolder);
+        if (StrUtil.isBlank(name)) {
+            return ApiResponse.error("名称不能为空");
+        }
 
-        return ApiResponse.ok(keyHolder.getKey().intValue());
+        Integer count = jdbcTemplate.queryForObject("SELECT count(1) as c FROM users WHERE name = ?", (rs, rowNum) -> rs.getInt("c"), name);
+
+        if (count > 0) {
+            return ApiResponse.error("用户名已存在");
+        }
+
+        try {
+            jdbcTemplate.update("INSERT INTO users (name, data) values (?, ?)", name, data);
+        } catch (DataAccessException e) {
+            log.error("Insert user error : ", e);
+            return ApiResponse.error("用户名已存在");
+        }
+
+        return ApiResponse.ok();
     }
 
     @PutMapping
     public ApiResponse update(@RequestBody JSONObject jsonObject) {
-        String id = jsonObject.getStr("id");
+        String name = jsonObject.getStr("name");
+
         String data = jsonObject.getStr("data");
 
-        if (StrUtil.isBlank(id)) {
-            return ApiResponse.error("missing id");
+        if (StrUtil.isBlank(name)) {
+            return ApiResponse.error("名称不能为空");
         }
 
-        String sql = "UPDATE users set `data` = ? WHERE id = ?";
+        Integer count = jdbcTemplate.queryForObject("SELECT count(1) as c FROM users WHERE name = ?", (rs, rowNum) -> rs.getInt("c"), name);
 
-        jdbcTemplate.update(sql, data, id);
+        if (count == 0) {
+            return ApiResponse.error("用户不存在");
+        }
+
+        String sql = "UPDATE users set `data` = ? WHERE name = ?";
+
+        jdbcTemplate.update(sql, data, name);
 
         return ApiResponse.ok();
     }
 
     @DeleteMapping
     public ApiResponse delete(@RequestBody JSONObject jsonObject) {
-        String id = jsonObject.getStr("id");
+        String name = jsonObject.getStr("name");
 
-        if (StrUtil.isBlank(id)) {
-            return ApiResponse.error("missing id");
+        if (StrUtil.isBlank(name)) {
+            return ApiResponse.error("名称不能为空");
         }
-
-        jdbcTemplate.update("DELETE FROM users where id = ?", id);
+        jdbcTemplate.update("DELETE FROM users where name = ?", name);
 
         return ApiResponse.ok();
     }
