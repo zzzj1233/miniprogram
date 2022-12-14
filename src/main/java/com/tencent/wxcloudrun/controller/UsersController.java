@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -33,10 +34,17 @@ public class UsersController {
         List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT * FROM users");
 
         return ApiResponse.ok(list.stream()
-                .map(it -> new JSONObject(it))
                 .map(it -> {
-                    JSONObject jsonObject = new JSONObject(it.getStr("name"));
-                    jsonObject.putAll(it.getJSONObject("data") == null ? Collections.emptyMap() : it.getJSONObject("data"));
+                    JSONObject jsonObject = new JSONObject();
+
+                    jsonObject.putOnce("name", it.get("name"));
+
+                    JSONObject data = Optional.ofNullable(it.get("data"))
+                            .map(JSONObject::new)
+                            .orElse(new JSONObject());
+
+                    jsonObject.putAll(data);
+
                     return jsonObject;
                 }).collect(Collectors.toList()));
     }
