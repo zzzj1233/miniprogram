@@ -76,7 +76,7 @@ public class UsersController {
         return ApiResponse.ok();
     }
 
-    @PutMapping
+    @PostMapping("/update")
     public ApiResponse update(@RequestBody JSONObject jsonObject) {
         String name = jsonObject.getStr("name");
 
@@ -99,7 +99,7 @@ public class UsersController {
         return ApiResponse.ok();
     }
 
-    @DeleteMapping
+    @PostMapping("/delete")
     public ApiResponse delete(@RequestBody JSONObject jsonObject) {
         String name = jsonObject.getStr("name");
 
