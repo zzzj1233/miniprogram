@@ -22,7 +22,7 @@ class BaiduAiControllerTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        baiduAiController = new BaiduAiController();
+        baiduAiController = new BaiduAiController(null);
 
         ClassPathResource resource = new ClassPathResource("img1.jpg");
 

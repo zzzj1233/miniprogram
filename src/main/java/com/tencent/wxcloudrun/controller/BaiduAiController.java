@@ -9,6 +9,7 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import com.tencent.wxcloudrun.config.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,9 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * @author zzzj
@@ -39,6 +41,11 @@ public class BaiduAiController {
 
     private static String accessToken;
 
+    private final JdbcTemplate jdbcTemplate;
+
+    public BaiduAiController(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     private static void requestAccessToken() {
         String url = URL + StrUtil.format("?client_id={}&client_secret={}&grant_type=client_credentials", CLIENT_ID, CLIENT_SECRET);
@@ -119,9 +126,9 @@ public class BaiduAiController {
         return ApiResponse.ok(matchResult);
     }
 
-    public static void doMatch(boolean strict,
-                               String words,
-                               Map<String, String> matchResult) {
+    public void doMatch(boolean strict,
+                        String words,
+                        Map<String, String> matchResult) {
 
         String[] kv = words.split("：");
 
@@ -137,22 +144,11 @@ public class BaiduAiController {
 
         String value = kv[1];
 
-        Properties properties = System.getProperties();
 
-        Map<String, String> props = new HashMap<>(System.getenv());
+        List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT * FROM `mapping`");
 
-        for (Map.Entry<Object, Object> entry : properties.entrySet()) {
-            String k = entry.getKey().toString();
-
-            String v = entry.getValue().toString();
-
-            if (StrUtil.isBlank(k) || StrUtil.isBlank(v) || props.containsKey(k)) {
-                continue;
-            }
-
-            props.put(k, v);
-        }
-
+        Map<String, String> props = list.stream()
+                .collect(Collectors.toMap(map -> map.get("key").toString(), map -> map.get("value").toString()));
 
         if (strict) {
             if (props.containsKey(name)) {
