@@ -72,6 +72,23 @@ public class BaiduAiController {
         }
     }
 
+    @PostMapping("match")
+    public ApiResponse match(
+            @RequestBody JSONObject params
+    ) {
+        List<String> words = params.getJSONArray("words").toList(String.class);
+
+        boolean strict = Boolean.parseBoolean(System.getProperty("strict", "false"));
+
+        Map<String, String> matchResult = new HashMap<>();
+
+        for (String word : words) {
+            doMatch(strict, word, matchResult);
+        }
+
+        return ApiResponse.ok(matchResult);
+    }
+
     @PostMapping("/text")
     public ApiResponse textRecognition(
             @RequestBody JSONObject params

@@ -31,9 +31,9 @@ class BaiduAiControllerTest {
 
     @Test
     public void text() throws Exception {
-        System.setProperty("名称","name");
-        System.setProperty("纳税人识别号","taxAccount");
-        System.setProperty("地址、电话","location");
+        System.setProperty("名称", "name");
+        System.setProperty("纳税人识别号", "taxAccount");
+        System.setProperty("地址、电话", "location");
 
         ApiResponse response = baiduAiController.textRecognition(
                 new JSONObject().putOnce("image", this.image)
