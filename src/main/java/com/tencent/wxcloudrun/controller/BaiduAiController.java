@@ -5,7 +5,6 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpResponse;
 import cn.hutool.http.HttpUtil;
-import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import com.tencent.wxcloudrun.config.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -78,15 +77,12 @@ public class BaiduAiController {
     ) {
         List<String> words = params.getJSONArray("words").toList(String.class);
 
-        boolean strict = Boolean.parseBoolean(System.getProperty("strict", "false"));
+        List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT * FROM `mapping`");
 
-        Map<String, String> matchResult = new HashMap<>();
+        Map<String, String> mapping = list.stream()
+                .collect(Collectors.toMap(map -> map.get("key").toString(), map -> map.get("value").toString()));
 
-        for (String word : words) {
-            doMatch(strict, word, matchResult);
-        }
-
-        return ApiResponse.ok(matchResult);
+        return ApiResponse.ok(doMatch(words, mapping));
     }
 
     @PostMapping("/text")
@@ -122,75 +118,73 @@ public class BaiduAiController {
 
         JSONObject jsonObject = new JSONObject(httpResponse.body());
 
-        JSONArray wordsResult = jsonObject.getJSONArray("words_result");
+        List<String> wordsList = jsonObject.getJSONArray("words_result").toList(JSONObject.class)
+                .stream().map(jo -> jo.getStr("words"))
+                .collect(Collectors.toList());
 
-        if (wordsResult.isEmpty()) {
+        if (wordsList.isEmpty()) {
             return ApiResponse.error("未失败到文字");
         }
 
-        boolean strict = Boolean.parseBoolean(System.getProperty("strict", "false"));
+        List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT * FROM `mapping`");
 
-        Map<String, String> matchResult = new HashMap<>();
+        Map<String, String> mapping = list.stream()
+                .collect(Collectors.toMap(map -> map.get("key").toString(), map -> map.get("value").toString()));
 
-        for (Object o : wordsResult) {
-            JSONObject word = new JSONObject(o);
-
-            String words = word.getStr("words");
-
-            doMatch(strict, words, matchResult);
-        }
+        Map<String, String> matchResult = doMatch(wordsList, mapping);
 
         return ApiResponse.ok(matchResult);
     }
 
-    public void doMatch(boolean strict,
-                        String words,
-                        Map<String, String> matchResult) {
-
-        String[] kv = words.split("：");
-
-        if (kv.length <= 1) {
-            kv = words.split(":");
-        }
-
-        if (kv.length <= 1) {
-            return;
-        }
-
-        String name = kv[0];
-
-        String value = kv[1];
+    Map<String, String> doMatch(List<String> wordsList,
+                                        Map<String, String> mapping) {
 
 
-        List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT * FROM `mapping`");
+        Map<String, String> matchResult = new HashMap<>();
 
-        Map<String, String> props = list.stream()
-                .collect(Collectors.toMap(map -> map.get("key").toString(), map -> map.get("value").toString()));
+        for (int i = 0; i < wordsList.size(); i++) {
+            String word = wordsList.get(i);
 
-        if (strict) {
-            if (props.containsKey(name)) {
-                matchResult.put(name, value);
+            String sep;
+
+            if (word.contains(":")) {
+                sep = ":";
+            } else if (word.contains("：")) {
+                sep = "：";
+            } else {
+                continue;
             }
-        } else {
 
-            for (Map.Entry<String, String> entry : props.entrySet()) {
+            String[] words = word.split(sep, 2);
+
+            // value在下一行
+            String name = words[0];
+
+            String value = words[1];
+
+            for (Map.Entry<String, String> entry : mapping.entrySet()) {
 
                 String k = entry.getKey();
 
                 String v = entry.getValue();
 
-                if (StrUtil.isBlank(k) || StrUtil.isBlank(v)) {
-                    continue;
-                }
-
                 if (k.contains(name)) {
-                    matchResult.put(v, value);
-                    return;
+                    if (StrUtil.isBlank(value)) {
+                        // value在下一行
+                        if (i + 1 < wordsList.size()) {
+                            String nextLine = wordsList.get(i + 1);
+                            matchResult.put(v, nextLine);
+                            i++;
+                        }
+                    } else {
+                        matchResult.put(v, value);
+                    }
+                    break;
                 }
 
             }
-
         }
+        return matchResult;
     }
 
 
